@@ -180,11 +180,26 @@ def build_computed_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         )[:3]
     ]
 
+    # Give the narrative generator concrete evidence for its explanation. Keep
+    # the list bounded so a large file cannot create an unnecessarily big LLM
+    # prompt; the full anomaly set is still persisted and returned by the API.
+    anomaly_details = [
+        {
+            "merchant": row["merchant"],
+            "amount": money_to_float(row["amount"]),
+            "currency": row["currency"],
+            "reason": row["anomaly_reason"],
+        }
+        for row in rows
+        if row["is_anomaly"]
+    ][:10]
+
     return {
         "total_spend_by_currency": total_spend_by_currency,
         "category_breakdown": category_breakdown,
         "top_3_merchants": top_merchants,
         "anomaly_count": sum(1 for row in rows if row["is_anomaly"]),
+        "anomaly_details": anomaly_details,
     }
 
 

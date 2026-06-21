@@ -2,14 +2,17 @@ services:
   api:
     build: .
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
     ports:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/transactions
       REDIS_URL: redis://redis:6379/0
       UPLOAD_DIR: /app/uploads
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
     volumes:
       - ./app:/app/app
       - ./uploads:/app/uploads
@@ -23,12 +26,15 @@ services:
   worker:
     build: .
     command: celery -A app.celery_app.celery_app worker --loglevel=info
+    env_file:
+      - path: .env
+        required: false
+      - path: .env.local
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/transactions
       REDIS_URL: redis://redis:6379/0
       UPLOAD_DIR: /app/uploads
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
     volumes:
       - ./app:/app/app
       - ./uploads:/app/uploads

@@ -1,66 +1,32 @@
 # AI Transaction Processing Pipeline
 
-Small FastAPI + Celery project for the backend internship assignment.
+A FastAPI + Celery service that ingests a transactions CSV, cleans and
+de-duplicates it, flags anomalies, classifies missing categories with an LLM
+(OpenRouter, with an offline fallback), and produces a narrative summary — all
+stored in PostgreSQL. Comes with a small web UI to upload a file and view the
+results.
 
 ## Run
 
+Backend and frontend start together with one command:
+
 ```bash
 docker compose up --build
 ```
 
-API docs: http://localhost:8000/docs
+- **Frontend (web UI):** http://localhost:8000/
+- **Backend (API docs):** http://localhost:8000/docs
 
-The app creates database tables on startup, so there are no manual migrations.
+Tables are created automatically on startup — no migrations needed.
 
-## Optional Gemini setup
+### Optional LLM (OpenRouter)
 
-The code uses Gemini when `GEMINI_API_KEY` is present:
+Works offline by default. To enable live LLM calls, add a free OpenRouter key:
 
 ```bash
-cp .env.example .env
-# add your key in .env
+cp .env.example .env.local   # add OPENROUTER_API_KEY in .env.local
 docker compose up --build
 ```
 
-Without a key, it uses a deterministic local fallback so the project still runs with one command.
-
-## Endpoints
-
-Upload the provided CSV:
-
-```bash
-curl -F "file=@transactions.csv" http://localhost:8000/jobs/upload
-```
-
-Check status:
-
-```bash
-curl http://localhost:8000/jobs/<job_id>/status
-```
-
-Fetch results:
-
-```bash
-curl http://localhost:8000/jobs/<job_id>/results
-```
-
-List jobs:
-
-```bash
-curl http://localhost:8000/jobs
-curl http://localhost:8000/jobs?status=completed
-```
-
-## What the worker does
-
-1. Cleans dates, amounts, statuses, blank categories, and duplicate rows.
-2. Flags account-level outliers and domestic-only brands charged in USD.
-3. Batches missing-category classification through Gemini or the local fallback.
-4. Asks Gemini for a JSON narrative summary, with retry and fallback behavior.
-5. Stores cleaned transactions, anomalies, category totals, and summary JSON in PostgreSQL.
-
-## Tests
-
-```bash
-pytest
-```
+Both `.env` and `.env.local` are supported and ignored by Git. If both exist,
+`.env.local` takes precedence.

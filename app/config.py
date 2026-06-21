@@ -8,8 +8,11 @@ class Settings:
     )
     redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
     upload_dir = os.getenv("UPLOAD_DIR", "/app/uploads")
-    gemini_api_key = os.getenv("GEMINI_API_KEY", "")
-    gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
+    openrouter_model = os.getenv("OPENROUTER_MODEL", "openrouter/free")
+    openrouter_base_url = os.getenv(
+        "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+    )
 
 
 settings = Settings()

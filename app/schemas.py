@@ -64,6 +64,7 @@ class JobSummaryOut(BaseModel):
     narrative: str | None
     risk_level: str
     llm_failed: bool
+    analysis_source: str
 
     class Config:
         from_attributes = True

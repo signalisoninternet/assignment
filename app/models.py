@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime
 
@@ -75,3 +76,16 @@ class JobSummary(Base):
     llm_failed = Column(Boolean, default=False)
 
     job = relationship("Job", back_populates="summary")
+
+    @property
+    def analysis_source(self) -> str:
+        """Identify the summary source without adding another database column."""
+        if self.llm_failed:
+            return "local_fallback"
+        try:
+            raw = json.loads(self.llm_raw_response or "{}")
+            if raw.get("source") == "local_fallback":
+                return "local_fallback"
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return "openrouter"

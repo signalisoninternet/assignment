@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Transaction Processing Pipeline</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #273449;
+      --border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #818cf8;
+      --good: #34d399;
+      --warn: #fbbf24;
+      --bad: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 24px 32px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #14213d 0%, var(--bg) 100%);
+    }
+    header h1 { margin: 0; font-size: 22px; }
+    header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .provider-name { color: var(--accent); font-weight: 600; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 32px 64px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .card h2 { margin: 0 0 16px; font-size: 16px; }
+    .upload-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    input[type=file] {
+      color: var(--muted); background: var(--panel-2);
+      border: 1px dashed var(--border); border-radius: 8px; padding: 10px;
+      flex: 1; min-width: 240px;
+    }
+    button {
+      background: var(--accent); color: #042f3a; border: none;
+      padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { filter: brightness(1.08); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status-line { margin-top: 14px; font-size: 14px; color: var(--muted); min-height: 20px; }
+    .spinner {
+      display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite;
+      vertical-align: -2px; margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+    .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .risk-low { background: rgba(52,211,153,0.15); color: var(--good); }
+    .risk-medium { background: rgba(251,191,36,0.15); color: var(--warn); }
+    .risk-high { background: rgba(248,113,113,0.15); color: var(--bad); }
+    .pill { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+
+    .ai-review { margin-top: 20px; background: rgba(129,140,248,0.08); border: 1px solid rgba(129,140,248,0.45); border-radius: 12px; padding: 18px; }
+    .ai-review-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+    .ai-review-head h2 { margin: 0 0 4px; }
+    .ai-review-head p { margin: 0; font-size: 13px; color: var(--muted); }
+    .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .insight { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+    .insight h3 { margin: 0 0 7px; font-size: 13px; color: var(--accent); }
+    .insight p { margin: 0; font-size: 14px; }
+    .insight ul { margin: 0; padding-left: 19px; font-size: 14px; }
+    .review-note { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 720px) { .two-col, .ai-grid { grid-template-columns: 1fr; } }
+    .kv { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .kv:last-child { border-bottom: none; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 12px; text-align: left; white-space: nowrap; }
+    thead th { background: var(--panel-2); color: var(--muted); position: sticky; top: 0; font-weight: 600; }
+    tbody tr { border-top: 1px solid var(--border); }
+    tbody tr.anomaly { background: rgba(248,113,113,0.08); }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border); }
+    .tag.flag { background: rgba(248,113,113,0.15); color: var(--bad); border-color: transparent; }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .tab { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .tab.active { background: var(--accent); color: #042f3a; border-color: transparent; font-weight: 600; }
+
+    .jobs-list .job { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: var(--panel-2); }
+    .jobs-list .job:hover { border-color: var(--accent); }
+    .jobs-list .job .meta { color: var(--muted); font-size: 12px; }
+    .st { font-size: 11px; padding: 2px 8px; border-radius: 6px; }
+    .st-completed { background: rgba(52,211,153,0.15); color: var(--good); }
+    .st-failed { background: rgba(248,113,113,0.15); color: var(--bad); }
+    .st-pending, .st-processing { background: rgba(56,189,248,0.15); color: var(--accent); }
+    .error-box { background: rgba(248,113,113,0.1); border: 1px solid var(--bad); color: var(--bad); padding: 12px; border-radius: 8px; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>AI Transaction Processing Pipeline</h1>
+    <p>
+      Upload a transactions CSV — it is cleaned, categorised, scanned for anomalies, and summarised.
+      <span class="provider-name">AI insights powered by OpenRouter.</span>
+    </p>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Upload CSV</h2>
+      <form id="upload-form" class="upload-row">
+        <input type="file" id="file-input" accept=".csv" required />
+        <button type="submit" id="upload-btn">Upload &amp; Process</button>
+      </form>
+      <div class="status-line" id="status-line"></div>
+    </div>
+
+    <div class="card" id="results" style="display:none">
+      <h2>Results <span class="muted" id="results-file"></span></h2>
+
+      <div class="grid" id="stats"></div>
+
+      <section class="ai-review" aria-labelledby="review-title">
+        <div class="ai-review-head">
+          <div>
+            <h2 id="review-title">Automated Transaction Review</h2>
+            <p>Plain-language explanation of the processed file and suggested next steps.</p>
+          </div>
+          <span class="badge pill" id="analysis-source">Automated review</span>
+        </div>
+        <div class="ai-grid">
+          <article class="insight">
+            <h3>What was found?</h3>
+            <p id="narrative"></p>
+          </article>
+          <article class="insight">
+            <h3>How was it analysed?</h3>
+            <p id="analysis-method"></p>
+          </article>
+          <article class="insight">
+            <h3>Why was it flagged?</h3>
+            <div id="flag-reasons"></div>
+          </article>
+          <article class="insight">
+            <h3>How should it be handled?</h3>
+            <p id="recommended-action"></p>
+          </article>
+        </div>
+        <p class="review-note">This review highlights unusual patterns; it does not confirm fraud. Verify flagged items against the original account statement.</p>
+      </section>
+
+      <div class="two-col" style="margin-top:20px">
+        <div>
+          <h2 style="font-size:14px">Spend by Category</h2>
+          <div id="categories"></div>
+        </div>
+        <div>
+          <h2 style="font-size:14px">Top Merchants</h2>
+          <div id="merchants"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:24px">
+        <div class="tabs">
+          <div class="tab active" data-tab="all">All Transactions</div>
+          <div class="tab" data-tab="anomalies">Flagged Anomalies</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Merchant</th><th class="num">Amount</th><th>Cur</th>
+                <th>Category</th><th>Status</th><th>Account</th><th>Flag</th>
+              </tr>
+            </thead>
+            <tbody id="txn-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent Jobs <button id="refresh-jobs" style="float:right;padding:4px 12px;font-size:12px">Refresh</button></h2>
+      <div class="jobs-list" id="jobs-list"><span class="muted">Loading…</span></div>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let pollTimer = null;
+    let currentResults = null;
+    let activeTab = "all";
+
+    function fmtAmount(v) {
+      const n = typeof v === "number" ? v : parseFloat(v);
+      if (isNaN(n)) return v;
+      return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtMoneyMap(map) {
+      const parts = Object.entries(map || {}).map(([cur, amt]) => `${cur} ${fmtAmount(amt)}`);
+      return parts.length ? parts.join(" · ") : "—";
+    }
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    // ---- Upload ----
+    $("upload-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const file = $("file-input").files[0];
+      if (!file) return;
+      $("upload-btn").disabled = true;
+      setStatus(`<span class="spinner"></span>Uploading ${esc(file.name)}…`);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/jobs/upload", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Upload failed");
+        pollStatus(data.job_id);
+        loadJobs();
+      } catch (err) {
+        setStatus(`<span class="error-box">${esc(err.message)}</span>`);
+        $("upload-btn").disabled = false;
+      }
+    });
+
+    function setStatus(html) { $("status-line").innerHTML = html; }
+
+    // ---- Poll ----
+    function pollStatus(jobId) {
+      if (pollTimer) clearInterval(pollTimer);
+      const tick = async () => {
+        try {
+          const res = await fetch(`/jobs/${jobId}/status`);
+          const job = await res.json();
+          if (!res.ok) throw new Error(job.detail || "Status check failed");
+          if (job.status === "completed") {
+            clearInterval(pollTimer);
+            setStatus(`<span class="st st-completed">completed</span> ${esc(job.filename)} — ${job.row_count_clean} clean rows`);
+            $("upload-btn").disabled = false;
+            loadResults(jobId);
+            loadJobs();
+          } else if (job.status === "failed") {
+            clearInterval(pollTimer);
+            setStatus(`<span class="error-box">Job failed: ${esc(job.error_message || "unknown error")}</span>`);
+            $("upload-btn").disabled = false;
+            loadJobs();
+          } else {
+            setStatus(`<span class="spinner"></span><span class="st st-${job.status}">${job.status}</span> processing ${esc(job.filename)}…`);
+          }
+        } catch (err) {
+          clearInterval(pollTimer);
+          setStatus(`<span class="error-box">${esc(err.message)}</span>`);
+          $("upload-btn").disabled = false;
+        }
+      };
+      tick();
+      pollTimer = setInterval(tick, 1500);
+    }
+
+    // ---- Results ----
+    async function loadResults(jobId) {
+      const res = await fetch(`/jobs/${jobId}/results`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Could not load results");
+      currentResults = data;
+      renderResults(data);
+    }
+
+    function renderResults(data) {
+      $("results").style.display = "block";
+      const s = data.llm_summary || {};
+      $("results-file").textContent = "";
+      const risk = (s.risk_level || "low").toLowerCase();
+
+      $("stats").innerHTML = [
+        stat("Total Spend", fmtMoneyMap(s.total_spend_by_currency)),
+        stat("Clean Transactions", data.cleaned_transactions.length),
+        stat("Anomalies", data.flagged_anomalies.length),
+        stat("Risk Level", `<span class="badge risk-${risk}">${esc(risk)}</span>`),
+      ].join("");
+
+      renderAutomatedReview(data, s, risk);
+
+      // categories
+      const cats = Object.entries(data.per_category_spend || {}).sort((a, b) => b[1] - a[1]);
+      $("categories").innerHTML = cats.length
+        ? cats.map(([c, amt]) => `<div class="kv"><span>${esc(c)}</span><span>${fmtAmount(amt)}</span></div>`).join("")
+        : '<span class="muted">No data.</span>';
+
+      // merchants
+      const merch = s.top_merchants || [];
+      $("merchants").innerHTML = merch.length
+        ? merch.map((m) => `<div class="kv"><span>${esc(m.merchant)}</span><span>${fmtAmount(m.amount)}</span></div>`).join("")
+        : '<span class="muted">No data.</span>';
+
+      renderTable();
+    }
+
+    function renderAutomatedReview(data, summary, risk) {
+      const transactions = data.cleaned_transactions || [];
+      const anomalies = data.flagged_anomalies || [];
+      const classified = transactions.filter((t) => t.llm_category).length;
+      const source = summary.analysis_source === "local_fallback" ? "Local fallback" : "OpenRouter AI";
+
+      $("analysis-source").textContent = source;
+      $("narrative").innerHTML = summary.narrative
+        ? esc(summary.narrative)
+        : '<span class="muted">No narrative was generated.</span>';
+
+      $("analysis-method").textContent =
+        `${transactions.length} cleaned transaction(s) were checked using account-level amount and currency rules. ` +
+        `${classified} missing category value(s) were filled using OpenRouter or the local fallback.`;
+
+      const amountFlags = anomalies.filter((t) => (t.anomaly_reason || "").includes("more than 3x")).length;
+      const currencyFlags = anomalies.filter((t) => (t.anomaly_reason || "").includes("Domestic-only merchant")).length;
+      const reasons = [];
+      if (amountFlags) reasons.push(`${amountFlags} transaction(s) were above three times the account median.`);
+      if (currencyFlags) reasons.push(`${currencyFlags} domestic merchant transaction(s) were charged in USD.`);
+      $("flag-reasons").innerHTML = reasons.length
+        ? `<ul>${reasons.map((reason) => `<li>${esc(reason)}</li>`).join("")}</ul>`
+        : '<p>No configured anomaly rule was triggered.</p>';
+
+      let action;
+      if (!anomalies.length) {
+        action = "No immediate action is required. Keep normal monitoring and verify automatically assigned categories before using them for reporting.";
+      } else if (risk === "high") {
+        action = "Review all flagged transactions first. Confirm the merchant, amount and currency with the account holder. If any item is not recognised, contact the bank immediately and follow the organisation’s incident process.";
+      } else {
+        action = "Compare each flagged transaction with the original statement or receipt. Confirm unusual amounts and currencies with the account holder, then escalate any unrecognised item to the bank or finance team.";
+      }
+      if (summary.llm_failed) {
+        action += " The external AI request failed, so manually verify the fallback summary.";
+      }
+      $("recommended-action").textContent = action;
+    }
+
+    function stat(label, value) {
+      return `<div class="stat"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+    }
+
+    function renderTable() {
+      if (!currentResults) return;
+      const rows = activeTab === "anomalies" ? currentResults.flagged_anomalies : currentResults.cleaned_transactions;
+      if (!rows.length) {
+        $("txn-body").innerHTML = `<tr><td colspan="8" class="muted" style="padding:20px">No transactions.</td></tr>`;
+        return;
+      }
+      $("txn-body").innerHTML = rows.map((t) => {
+        const cat = t.llm_category || t.category;
+        const llmTag = t.llm_category ? ` <span class="tag">AI</span>` : "";
+        const flag = t.is_anomaly ? `<span class="tag flag" title="${esc(t.anomaly_reason || "")}">anomaly</span>` : "";
+        return `<tr class="${t.is_anomaly ? "anomaly" : ""}">
+          <td>${esc(t.date || "—")}</td>
+          <td>${esc(t.merchant)}</td>
+          <td class="num">${fmtAmount(t.amount)}</td>
+          <td>${esc(t.currency)}</td>
+          <td>${esc(cat)}${llmTag}</td>
+          <td>${esc(t.status)}</td>
+          <td>${esc(t.account_id)}</td>
+          <td>${flag}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+        activeTab = tab.dataset.tab;
+        renderTable();
+      });
+    });
+
+    // ---- Jobs list ----
+    async function loadJobs() {
+      try {
+        const res = await fetch("/jobs");
+        const jobs = await res.json();
+        if (!jobs.length) { $("jobs-list").innerHTML = '<span class="muted">No jobs yet.</span>'; return; }
+        $("jobs-list").innerHTML = jobs.map((j) => `
+          <div class="job" data-id="${esc(j.job_id)}" data-status="${esc(j.status)}">
+            <div>
+              <div>${esc(j.filename)}</div>
+              <div class="meta">${new Date(j.created_at + "Z").toLocaleString()} · ${j.row_count_clean}/${j.row_count_raw} rows</div>
+            </div>
+            <span class="st st-${esc(j.status)}">${esc(j.status)}</span>
+          </div>`).join("");
+        document.querySelectorAll(".jobs-list .job").forEach((el) => {
+          el.addEventListener("click", () => {
+            const id = el.dataset.id;
+            if (el.dataset.status === "completed") {
+              setStatus(`Loaded job ${id.slice(0, 8)}…`);
+              loadResults(id).catch((e) => setStatus(`<span class="error-box">${esc(e.message)}</span>`));
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else if (el.dataset.status === "pending" || el.dataset.status === "processing") {
+              pollStatus(id);
+            } else {
+              setStatus(`<span class="error-box">Job ${id.slice(0, 8)} is ${el.dataset.status}.</span>`);
+            }
+          });
+        });
+      } catch (err) {
+        $("jobs-list").innerHTML = `<span class="error-box">${esc(err.message)}</span>`;
+      }
+    }
+
+    $("refresh-jobs").addEventListener("click", loadJobs);
+    loadJobs();
+  </script>
+</body>
+</html>

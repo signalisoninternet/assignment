@@ -3,6 +3,8 @@ import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from app.celery_app import celery_app
@@ -15,11 +17,19 @@ from app.schemas import JobListItem, JobResultsResponse, JobStatusResponse
 
 app = FastAPI(title="AI Transaction Processing Pipeline")
 
+STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
 @app.on_event("startup")
 def on_startup():
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
     init_db()
+
+
+@app.get("/", include_in_schema=False)
+def index():
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")

@@ -28,8 +28,9 @@ class LLMError(Exception):
 
 class LLMClient:
     def __init__(self):
-        self.api_key = settings.gemini_api_key
-        self.model = settings.gemini_model
+        self.api_key = settings.openrouter_api_key
+        self.model = settings.openrouter_model
+        self.base_url = settings.openrouter_base_url.rstrip("/")
 
     def classify_transactions(self, rows: list[dict[str, Any]]) -> tuple[dict[int, str], str, bool]:
         if not rows:
@@ -75,8 +76,12 @@ class LLMClient:
             "Create a transaction summary as valid JSON only. Use this exact shape: "
             '{"total_spend_by_currency":{"INR":0,"USD":0},'
             '"top_3_merchants":[{"merchant":"Name","amount":0}],'
-            '"anomaly_count":0,"narrative":"2-3 sentences","risk_level":"low"}.\n'
+            '"anomaly_count":0,"narrative":"3-4 short sentences","risk_level":"low"}.\n'
             'risk_level must be one of "low", "medium", "high".\n'
+            "Write the narrative in simple language. Explain what was found, why "
+            "the flagged transactions need attention, and the safest next action. "
+            "Use only the supplied facts, do not invent a cause, and do not claim "
+            "that a transaction is fraud.\n"
             f"Transaction facts: {json.dumps(context, default=str)}"
         )
         data, raw = self._call_json(prompt)
@@ -96,18 +101,19 @@ class LLMClient:
         last_error = None
         for attempt in range(3):
             try:
-                url = (
-                    "https://generativelanguage.googleapis.com/v1beta/models/"
-                    f"{self.model}:generateContent?key={self.api_key}"
-                )
+                url = f"{self.base_url}/chat/completions"
                 response = requests.post(
                     url,
-                    json={"contents": [{"parts": [{"text": prompt}]}]},
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                    },
                     timeout=30,
                 )
                 response.raise_for_status()
                 body = response.json()
-                text = body["candidates"][0]["content"]["parts"][0]["text"]
+                text = body["choices"][0]["message"]["content"]
                 return self._parse_json_text(text), text
             except Exception as exc:  # requests, malformed JSON, model format drift
                 last_error = exc
@@ -150,10 +156,18 @@ class LLMClient:
         totals = context["total_spend_by_currency"]
         top = context["top_3_merchants"]
         top_name = top[0]["merchant"] if top else "the leading merchant"
+        if anomaly_count:
+            next_step = (
+                "Review each flagged merchant, amount and currency against the source "
+                "statement, and contact the bank if a transaction is not recognised."
+            )
+        else:
+            next_step = "No immediate action is required, but normal account monitoring should continue."
         narrative = (
             f"Total spend was INR {totals.get('INR', 0)} and USD {totals.get('USD', 0)}. "
             f"{top_name} had the highest merchant spend. "
-            f"{anomaly_count} anomalies were detected, so the risk level is {risk}."
+            f"The rule-based checks flagged {anomaly_count} transaction(s), giving a {risk} risk level. "
+            f"{next_step}"
         )
         return {
             "total_spend_by_currency": totals,
